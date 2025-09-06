@@ -66,6 +66,24 @@ class Ladder extends LadderStore {
 			return null;
 		}
 
+		// Redirect users with ELO >= 1 from Battle Centrifuge to Battle Centrifuge Plus
+		if (this.formatid === 'gen9battlecentrifuge' && isRated) {
+			// Get the user's rating for the current format
+			const uid = user.id;
+			const userRating = await this.getRating(uid);
+			if (userRating && userRating >= 1) {
+				// Redirect to Battle Centrifuge Plus
+				this.formatid = 'gen9battlecentrifugeplus';
+				// Re-validate the new format
+				try {
+					this.formatid = Dex.formats.validate(this.formatid);
+				} catch (e: any) {
+					connection.popup(`Error redirecting to Battle Centrifuge Plus:\n\n- ${e.message}`);
+					return null;
+				}
+			}
+		}
+
 		let rating = 0;
 		let valResult;
 		let removeNicknames = !!(user.locked || user.namelocked);
@@ -357,11 +375,16 @@ class Ladder extends LadderStore {
 		const elapsed = Date.now() - Math.min(...times);
 		if (formatid === `gen${Dex.gen}ou` || formatid === `gen${Dex.gen}randombattle`) {
 			searchRange = 50;
+		} else if (formatid === 'gen9battlecentrifuge' || formatid === 'gen9battlecentrifugeplus') {
+			// Battle Centrifuge: start at 2, +1 every 10 seconds, max 10
+			searchRange = 2;
+			searchRange += Math.floor(elapsed / 10000); // +1 every 10 seconds (10000ms)
+			if (searchRange > 10) searchRange = 10;
+		} else {
+			searchRange += elapsed / 300; // +1 every .3 seconds
+			if (searchRange > 300) searchRange = 300 + (searchRange - 300) / 10; // +1 every 3 sec after 300
+			if (searchRange > 600) searchRange = 600;
 		}
-
-		searchRange += elapsed / 300; // +1 every .3 seconds
-		if (searchRange > 300) searchRange = 300 + (searchRange - 300) / 10; // +1 every 3 sec after 300
-		if (searchRange > 600) searchRange = 600;
 		const ratings = matches.map(([search]) => search.rating);
 		if (Math.max(...ratings) - Math.min(...ratings) > searchRange) return false;
 

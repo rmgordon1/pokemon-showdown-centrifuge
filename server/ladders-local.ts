@@ -115,7 +115,13 @@ export class LadderStore {
 		}
 		if (createIfNeeded) {
 			const index = this.ladder.length;
-			this.ladder.push([userid, 1000, username, 0, 0, 0, '']);
+			const format = Dex.formats.get(this.formatid);
+			let startingElo = typeof (format as any).startingElo === 'number' ? (format as any).startingElo : 1000;
+			// If streakBased is true, automatically set startingElo to 0
+			if ((format as any).streakBased) {
+				startingElo = 0;
+			}
+			this.ladder.push([userid, startingElo, username, 0, 0, 0, '']);
 			return index;
 		}
 		return -1;
@@ -153,7 +159,13 @@ export class LadderStore {
 		}
 		const ladder = await this.getLadder();
 		const index = this.indexOfUser(userid);
-		let rating = 1000;
+		const format = Dex.formats.get(this.formatid);
+		let startingElo = typeof (format as any).startingElo === 'number' ? (format as any).startingElo : 1000;
+		// If streakBased is true, automatically set startingElo to 0
+		if ((format as any).streakBased) {
+			startingElo = 0;
+		}
+		let rating = startingElo;
 		if (index >= 0) {
 			rating = ladder[index][1];
 		}
@@ -300,6 +312,18 @@ export class LadderStore {
 	 * Calculates Elo based on a match result
 	 */
 	calculateElo(oldElo: number, score: number, foeElo: number): number {
+		const format = Dex.formats.get(this.formatid);
+		
+		// Check for streak-based ELO system
+		if ((format as any).streakBased) {
+			// Simple win=+1, loss=0 system
+			if (score > 0.5) {
+				return oldElo + 1; // Win: increment by 1
+			} else {
+				return 0; // Loss: reset to 0
+			}
+		}
+
 		// The K factor determines how much your Elo changes when you win or
 		// lose games. Larger K means more change.
 		// In the "original" Elo, K is constant, but it's common for K to
@@ -323,8 +347,13 @@ export class LadderStore {
 		const E = 1 / (1 + 10 ** ((foeElo - oldElo) / 400));
 
 		const newElo = oldElo + K * (score - E);
+		let startingElo = typeof (format as any).startingElo === 'number' ? (format as any).startingElo : 1000;
+		// If streakBased is true, automatically set startingElo to 0
+		if ((format as any).streakBased) {
+			startingElo = 0;
+		}
 
-		return Math.max(newElo, 1000);
+		return Math.max(newElo, startingElo);
 	}
 
 	/**
