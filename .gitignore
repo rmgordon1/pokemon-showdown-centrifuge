@@ -12,6 +12,8 @@ npm-debug.log
 .eslintcache
 .eslintcache-no-types
 /tools/set-import/sets
+pokemon-showdown.code-workspace
+server.log
 databases/*.db*
 *.o
 *.o.dSYM
