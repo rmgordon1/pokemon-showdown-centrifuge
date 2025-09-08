@@ -1,3 +1,35 @@
+Pokémon Showdown - Battle Centrifuge
+========================================================================
+
+Hi Guys! This is just a fork of Pokémon Showdown's server with a custom gamemode added. All info about what its forked from starts below at **Pokémon Showdown**
+
+
+Battle Centrifuge - Introduction
+------------------------------------------------------------------------
+
+- Battle Centrifuge is a gamemode modeled after Battle Factory from the postgame of Gen 3/4. The rules are as follows:
+
+  - On your first game, you will have a team of 6 random Pokémon from the same logic that controls Pokémon Showdown's iconic Random Battles format
+  - You will choose 3 of the 6 you are given to play this game with.
+  - If you defeat your opponent, you will have your 3 Pokémon saved on the server. In addition, you will get the choice to swap one of the Pokémon you battled with one of your opponents.
+  - Subsequent wins will also allow for a swap
+
+- Changes to Elo/Matchmaking
+
+  - In Battle Centrifuge, the more consecutive wins a player has the theoretically better their team is
+  - To make Battle-Centrifuge equitable, the matchmaking is changed as follows:
+    - All players start at 0 Elo for this gamemode
+    - A win increases your Elo by 1
+    - A loss resets your Elo to 0
+    - Matchmaking is adjusted so the search range is narrower given the difference in scale between this elo and traditionally.
+
+
+A Server at this address is up for you to test.
+
+Thanks!
+========================================================================
+
+
 Pokémon Showdown
 ========================================================================
 
