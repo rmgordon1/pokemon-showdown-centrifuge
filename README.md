@@ -12,7 +12,7 @@ Battle Centrifuge - Introduction
   - On your first game, you will have a team of 6 random Pokémon from the same logic that controls Pokémon Showdown's iconic Random Battles format
   - You will choose 3 of the 6 you are given to play this game with.
   - If you defeat your opponent, you will have your 3 Pokémon saved on the server. In addition, you will get the choice to swap one of the Pokémon you battled with one of your opponents.
-  - Subsequent wins will also allow for a swap
+  - Subsequent games will use this saved set. You can swap up to once after each win
 
 - Changes to Elo/Matchmaking
 
