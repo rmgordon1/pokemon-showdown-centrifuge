@@ -307,10 +307,7 @@ export class RoomBattleTimer {
 	}
 	nextRequest(player: RoomBattlePlayer) {
 		if (player.secondsLeft <= 0) return;
-		if (player.request.isWait) {
-			player.turnSecondsLeft = this.settings.maxPerTurn;
-			return;
-		}
+		if (player.request.isWait) return;
 
 		if (this.timer) {
 			clearTimeout(this.timer);
@@ -520,7 +517,6 @@ export class RoomBattle extends RoomGame<RoomBattlePlayer> {
 	override readonly timer: RoomBattleTimer;
 	started = false;
 	active = false;
-	password = "";
 	replaySaved: boolean | 'auto' = false;
 	forcedSettings: { modchat?: string | null, privacy?: string | null } = {};
 	p1: RoomBattlePlayer = null!;
@@ -528,6 +524,13 @@ export class RoomBattle extends RoomGame<RoomBattlePlayer> {
 	p3: RoomBattlePlayer = null!;
 	p4: RoomBattlePlayer = null!;
 	inviteOnlySetter: ID | null = null;
+	battleCentrifugePlusData: {
+		winnerTeam: any[];
+		loserTeam: any[];
+		winnerid: ID;
+		pendingSelection: boolean;
+		selectedOpponentIndex?: number;
+	} | null = null;
 	logData: AnyObject | null = null;
 	endType: 'forfeit' | 'forced' | 'normal' = 'normal';
 	/**
@@ -566,6 +569,31 @@ export class RoomBattle extends RoomGame<RoomBattlePlayer> {
 		}
 
 		this.room.battle = this;
+
+		// Inject packed team for Battle Centrifuge Plus
+		if (format.id === 'gen9battlecentrifugeplus') {
+			const fs = require('fs');
+			const Teams = require('../sim/teams').Teams;
+			const file = 'config/ladders/gen9battlecentrifuge-savedsets.tsv';
+			for (const p of options.players) {
+				if (!p.team && p.user) {
+					const userid = toID(p.user.name);
+					try {
+						if (fs.existsSync(file)) {
+							const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
+							const userLine = lines.find((l: string) => l.startsWith(userid + '\t'));
+							if (userLine) {
+								const [, ...setStrings] = userLine.split('\t');
+								const sets = setStrings.map((str: string) => JSON.parse(str));
+								p.team = Teams.pack(sets);
+							}
+						}
+					} catch (error) {
+						// If error, do nothing and let fallback to random
+					}
+				}
+			}
+		}
 
 		const battleOptions = {
 			formatid: this.format,
@@ -804,7 +832,7 @@ export class RoomBattle extends RoomGame<RoomBattlePlayer> {
 				};
 				this.requestCount++;
 				player?.sendRoom(`|request|${requestJSON}`);
-				if (!request.update) this.timer.nextRequest(player);
+				this.timer.nextRequest(player);
 				break;
 			}
 			player?.sendRoom(lines[2]);
@@ -836,6 +864,81 @@ export class RoomBattle extends RoomGame<RoomBattlePlayer> {
 		// Declare variables here in case we need them for non-rated battles logging.
 		let p1score = 0.5;
 		const winnerid = toID(winnerName);
+
+		// --- Battle Centrifuge set saving logic ---
+		const formatid = Dex.formats.get(this.format, true).id;
+		if (formatid === 'gen9battlecentrifuge' && this.logData) {
+			const winnerSide = (winnerid === this.p1.id) ? 'p1' : 'p2';
+			
+			// Extract picked indexes from input log
+			const teamLogLine = this.logData.inputLog?.find((line: string) => line.startsWith(`>${winnerSide} team`));
+			let pickedIndexes;
+			if (teamLogLine) {
+				const teamMatch = teamLogLine.match(/team ([\d,\s]+)/);
+				if (teamMatch) {
+					pickedIndexes = teamMatch[1].split(',').map((i: string) => parseInt(i.trim()) - 1); // Convert to 0-based
+				}
+			}
+			if (!pickedIndexes) {
+				pickedIndexes = this.logData[winnerSide]?.pickedTeamIndexes;
+			}
+			
+			const team = this.logData[winnerSide + 'team'];
+			if (Array.isArray(pickedIndexes) && Array.isArray(team) && pickedIndexes.length === 3) {
+				const pickedSets = pickedIndexes.map(idx => team[idx]);
+				const line = [winnerid, ...pickedSets.map(set => JSON.stringify(set))].join('\t') + '\n';
+				const fs = require('fs');
+				const file = 'config/ladders/gen9battlecentrifuge-savedsets.tsv';
+				try {
+					let lines = [];
+					if (fs.existsSync(file)) {
+						lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
+					}
+					const newLines = lines.filter((l: string) => !l.startsWith(winnerid + '\t'));
+					newLines.push(line.trim());
+					fs.writeFileSync(file, newLines.join('\n') + '\n');
+				} catch (error) {
+					// Silently handle file write errors
+				}
+			}
+		}
+
+		// --- Battle Centrifuge Plus Pokemon selection logic ---
+		if (formatid === 'gen9battlecentrifugeplus' && this.logData && winnerid) {
+			const winnerSide = (winnerid === this.p1.id) ? 'p1' : 'p2';
+			const loserSide = (winnerid === this.p1.id) ? 'p2' : 'p1';
+			const winnerTeam = this.logData[winnerSide + 'team'];
+			const loserTeam = this.logData[loserSide + 'team'];
+			
+			if (Array.isArray(winnerTeam) && Array.isArray(loserTeam) && winnerTeam.length === 3 && loserTeam.length === 3) {
+				// Send Pokemon selection request to winner
+				this.battleCentrifugePlusData = {
+					winnerTeam,
+					loserTeam,
+					winnerid,
+					pendingSelection: true
+				};
+				
+				const winner = Users.get(winnerid);
+				if (winner) {
+					// Send opponent Pokemon options for selection
+					const opponentOptions = loserTeam.map((pokemon: any, index: number) => ({
+						index,
+						name: pokemon.name || pokemon.species,
+						species: pokemon.species,
+						item: pokemon.item,
+						ability: pokemon.ability
+					}));
+					
+					// Send Pokemon selection prompt similar to askreg
+					this.room.sendUser(winner, `|c|~Battle Centrifuge|🎉 **Victory!** Select an opponent's Pokémon to capture:`);
+					for (const [i, mon] of opponentOptions.entries()) {
+						this.room.sendUser(winner, `|c|~Battle Centrifuge|${i + 1}. **${mon.name}** (${mon.species}${mon.item ? ` @ ${mon.item}` : ''}, Ability: ${mon.ability}) - Use \`/selectopponent ${mon.index}\``);
+					}
+				}
+			}
+		}
+		// --- End Battle Centrifuge Plus Pokemon selection logic ---
 
 		// Check if the battle was rated to update the ladder, return its response, and log the battle.
 		if (winnerid === this.p1.id) {
@@ -878,13 +981,11 @@ export class RoomBattle extends RoomGame<RoomBattlePlayer> {
 		if (winner && !winner.registered) {
 			this.room.sendUser(winner, '|askreg|' + winner.id);
 		}
-		const p1 = this.p1.name;
-		const p2 = this.p2.name;
 		const [score, p1rating, p2rating] = await Ladders(this.ladder).updateRating(
-			p1, p2, p1score, this.room
+			this.p1.name, this.p2.name, p1score, this.room
 		);
 		void this.logBattle(score, p1rating, p2rating);
-		Chat.runHandlers('onBattleRanked', this, winnerid, [p1rating, p2rating], [p1, p2].map(toID));
+		Chat.runHandlers('onBattleRanked', this, winnerid, [p1rating, p2rating], [this.p1.id, this.p2.id]);
 	}
 	async logBattle(
 		p1score: number, p1rating: AnyObject | null = null, p2rating: AnyObject | null = null,
@@ -1310,6 +1411,88 @@ export class RoomBattle extends RoomGame<RoomBattlePlayer> {
 		const result = await logPromise;
 		return result;
 	}
+
+	selectOpponentPokemon(value: string, user: User) {
+		if (!this.battleCentrifugePlusData || !this.battleCentrifugePlusData.pendingSelection) {
+			return;
+		}
+		if (toID(user) !== this.battleCentrifugePlusData.winnerid) {
+			return;
+		}
+
+		const opponentIndex = parseInt(value);
+		if (isNaN(opponentIndex) || opponentIndex < 0 || opponentIndex >= this.battleCentrifugePlusData.loserTeam.length) {
+			return;
+		}
+
+		this.battleCentrifugePlusData.selectedOpponentIndex = opponentIndex;
+		const selectedPokemon = this.battleCentrifugePlusData.loserTeam[opponentIndex];
+
+		// Now show options to replace one of the winner's Pokemon
+		const yourTeamOptions = this.battleCentrifugePlusData.winnerTeam.map((pokemon: any, index: number) => ({
+			index,
+			name: pokemon.name || pokemon.species,
+			species: pokemon.species,
+			item: pokemon.item,
+			ability: pokemon.ability
+		}));
+
+		// Send own Pokemon selection prompt
+		const selectedName = selectedPokemon.name || selectedPokemon.species;
+		this.room.sendUser(user, `|c|~Battle Centrifuge|✅ **Selected: ${selectedName}** - Now choose one of your own Pokémon to replace:`);
+		for (const [i, mon] of yourTeamOptions.entries()) {
+			this.room.sendUser(user, `|c|~Battle Centrifuge|${i + 1}. **${mon.name}** (${mon.species}${mon.item ? ` @ ${mon.item}` : ''}, Ability: ${mon.ability}) - Use \`/selectown ${mon.index}\``);
+		}
+	}
+
+	selectOwnPokemon(value: string, user: User) {
+		if (!this.battleCentrifugePlusData || !this.battleCentrifugePlusData.pendingSelection || 
+			this.battleCentrifugePlusData.selectedOpponentIndex === undefined) {
+			return;
+		}
+		if (toID(user) !== this.battleCentrifugePlusData.winnerid) {
+			return;
+		}
+
+		const ownIndex = parseInt(value);
+		if (isNaN(ownIndex) || ownIndex < 0 || ownIndex >= this.battleCentrifugePlusData.winnerTeam.length) {
+			return;
+		}
+
+		// Perform the swap
+		const selectedOpponentPokemon = this.battleCentrifugePlusData.loserTeam[this.battleCentrifugePlusData.selectedOpponentIndex];
+		const replacedOwnPokemon = this.battleCentrifugePlusData.winnerTeam[ownIndex];
+		
+		// Replace the winner's Pokemon with the opponent's Pokemon
+		this.battleCentrifugePlusData.winnerTeam[ownIndex] = selectedOpponentPokemon;
+
+		// Save the new team to the savedsets file
+		const fs = require('fs');
+		const file = 'config/ladders/gen9battlecentrifuge-savedsets.tsv';
+		const winnerid = this.battleCentrifugePlusData.winnerid;
+		const newTeam = this.battleCentrifugePlusData.winnerTeam;
+		
+		try {
+			let lines: string[] = [];
+			if (fs.existsSync(file)) {
+				lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
+			}
+			const newLines = lines.filter((l: string) => !l.startsWith(winnerid + '\t'));
+			const line = [winnerid, ...newTeam.map(set => JSON.stringify(set))].join('\t');
+			newLines.push(line);
+			fs.writeFileSync(file, newLines.join('\n') + '\n');
+
+			// Show confirmation message
+			const replacedName = replacedOwnPokemon.name || replacedOwnPokemon.species;
+			const capturedName = selectedOpponentPokemon.name || selectedOpponentPokemon.species;
+			this.room.sendUser(user, `|c|~Battle Centrifuge|🎉 **Team Updated!** ${replacedName} has been replaced with ${capturedName} in your saved team. Your new team will be used in future Battle Centrifuge Plus matches!`);
+		} catch (error) {
+			this.room.sendUser(user, `|c|~Battle Centrifuge|❌ **Error:** Failed to save your updated team. Please try again.`);
+		}
+
+		// Clear the selection data
+		this.battleCentrifugePlusData = null;
+	}
 }
 
 export class RoomBattleStream extends BattleStream {
@@ -1365,9 +1548,7 @@ export const PM = new ProcessManager.StreamProcessManager(module, () => new Room
 
 if (!PM.isParentProcess) {
 	// This is a child process!
-	try {
-		require('source-map-support').install();
-	} catch {}
+	require('source-map-support').install();
 	global.Config = require('./config-loader').Config;
 	global.Dex = require('../sim/dex').Dex;
 	global.Monitor = {
@@ -1405,5 +1586,5 @@ if (!PM.isParentProcess) {
 	// eslint-disable-next-line no-eval
 	Repl.start(`sim-${process.pid}`, cmd => eval(cmd));
 } else {
-	PM.spawn(global.Config?.subprocessescache?.simulator ?? 1);
+	PM.spawn(global.Config ? Config.simulatorprocesses : 1);
 }

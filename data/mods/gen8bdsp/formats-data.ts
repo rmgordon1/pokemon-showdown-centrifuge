@@ -1622,7 +1622,7 @@ export const FormatsData: import('../../../sim/dex-species').ModdedSpeciesFormat
 		tier: "LC",
 	},
 	drifblim: {
-		tier: "PUBL",
+		tier: "PU",
 		doublesTier: "DUU",
 	},
 	buneary: {
@@ -1654,7 +1654,7 @@ export const FormatsData: import('../../../sim/dex-species').ModdedSpeciesFormat
 		doublesTier: "DOU",
 	},
 	chatot: {
-		tier: "PUBL",
+		tier: "PU",
 		doublesTier: "DUU",
 	},
 	spiritomb: {

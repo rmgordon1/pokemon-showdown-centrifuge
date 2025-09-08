@@ -173,5 +173,5 @@ if (require.main === module) {
 	// eslint-disable-next-line no-eval
 	Repl.start(`abusemonitor-local-${process.pid}`, cmd => eval(cmd));
 } else if (!process.send) {
-	PM.spawn(global.Config?.subprocessescache?.localartemis ?? 1);
+	PM.spawn(Config.localartemisprocesses || 1);
 }

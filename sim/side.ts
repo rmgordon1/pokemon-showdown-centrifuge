@@ -122,7 +122,6 @@ export interface SwitchRequest {
 	forceSwitch: boolean[];
 	side: SideRequestData;
 	noCancel?: boolean;
-	update?: boolean;
 }
 export interface TeamPreviewRequest {
 	wait?: undefined;
@@ -140,7 +139,6 @@ export interface MoveRequest {
 	side: SideRequestData;
 	ally?: SideRequestData;
 	noCancel?: boolean;
-	update?: boolean;
 }
 export interface WaitRequest {
 	wait: true;
@@ -485,8 +483,7 @@ export class Side {
 		this.battle.send('sideupdate', `${this.id}\n${sideUpdate}`);
 	}
 
-	emitRequest(update: ChoiceRequest = this.activeRequest!, updatedRequest = false) {
-		if (updatedRequest) (this.activeRequest as MoveRequest | SwitchRequest).update = true;
+	emitRequest(update: ChoiceRequest = this.activeRequest!) {
 		this.battle.send('sideupdate', `${this.id}\n|request|${JSON.stringify(update)}`);
 		this.activeRequest = update;
 	}
@@ -498,7 +495,7 @@ export class Side {
 		const updated = update ? this.updateRequestForPokemon(update.pokemon, update.update) : null;
 		const type = `[${updated ? 'Unavailable' : 'Invalid'} choice]`;
 		this.battle.send('sideupdate', `${this.id}\n|error|${type} ${message}`);
-		if (updated) this.emitRequest(this.activeRequest!, true);
+		if (updated) this.emitRequest();
 		if (this.battle.strictChoices) throw new Error(`${type} ${message}`);
 		return false;
 	}
@@ -580,7 +577,9 @@ export class Side {
 				}
 			}
 			if (!targetType) {
-				if (moveid !== 'testfight') {
+				if (moveid === 'testfight') {
+					targetType = 'normal';
+				} else {
 					return this.emitChoiceError(`Can't move: Your ${pokemon.name} doesn't have a move matching ${moveid}`);
 				}
 			}
@@ -622,7 +621,7 @@ export class Side {
 
 		// Validate targeting
 
-		if (autoChoose || moveid === 'testfight') {
+		if (autoChoose) {
 			targetLoc = 0;
 		} else if (this.battle.actions.targetTypeChoices(targetType)) {
 			if (!targetLoc && this.active.length >= 2) {
@@ -644,34 +643,28 @@ export class Side {
 			if (pokemon.volatiles[lockedMoveID]?.targetLoc) {
 				lockedMoveTargetLoc = pokemon.volatiles[lockedMoveID].targetLoc;
 			}
-			if (pokemon.maybeLocked) this.choice.cantUndo = true;
 			this.choice.actions.push({
 				choice: 'move',
 				pokemon,
 				targetLoc: lockedMoveTargetLoc,
 				moveid: lockedMoveID,
 			});
-			return true;
-		} else if (!moves.length) {
-			// Override action and use Struggle if there are no enabled moves with PP
-			// Gen 4 and earlier announce a Pokemon has no moves left before the turn begins, and only to that player's side.
-			if (this.battle.gen <= 4) this.send('-activate', pokemon, 'move: Struggle');
-			if (pokemon.maybeLocked) this.choice.cantUndo = true;
-			this.choice.actions.push({
-				choice: 'move',
-				pokemon,
-				moveid: 'struggle',
-			});
+			if (moveid === 'testfight') this.choice.cantUndo = true;
 			return true;
 		} else if (moveid === 'testfight') {
 			// test fight button
 			if (!pokemon.maybeLocked) {
 				return this.emitChoiceError(`Can't move: ${pokemon.name}'s Fight button is known to be safe`);
 			}
-			this.updateRequestForPokemon(pokemon, req => this.updateDisabledRequest(pokemon, req));
-			this.emitRequest(this.activeRequest!, true);
-			this.choice.error = 'Hack to avoid sending error messages to the client :D';
-			return false;
+			pokemon.maybeLocked = false;
+			return this.emitChoiceError(`${pokemon.name} is not locked`, { pokemon, update: req => {
+				delete req.maybeLocked;
+			} });
+		} else if (!moves.length && !zMove) {
+			// Override action and use Struggle if there are no enabled moves with PP
+			// Gen 4 and earlier announce a Pokemon has no moves left before the turn begins, and only to that player's side.
+			if (this.battle.gen <= 4) this.send('-activate', pokemon, 'move: Struggle');
+			moveid = 'struggle';
 		} else if (maxMove) {
 			// Dynamaxed; only Taunt and Assault Vest disable Max Guard, but the base move must have PP remaining
 			if (pokemon.maxMoveDisabled(move)) {
@@ -694,7 +687,7 @@ export class Side {
 				// Request a different choice
 				if (autoChoose) throw new Error(`autoChoose chose a disabled move`);
 				return this.emitChoiceError(`Can't move: ${pokemon.name}'s ${move.name} is disabled`, { pokemon, update: req => {
-					let updated = this.updateDisabledRequest(pokemon, req);
+					let updated = false;
 					for (const m of req.moves) {
 						if (m.id === moveid) {
 							if (!m.disabled) {
@@ -781,10 +774,8 @@ export class Side {
 			terastallize: terastallize ? pokemon.teraType : undefined,
 		});
 
-		if (pokemon.maybeDisabled && (this.battle.gameType === 'singles' || (
-			this.battle.gen <= 3 && !this.battle.actions.targetTypeChoices(targetType)
-		))) {
-			this.choice.cantUndo = true;
+		if (pokemon.maybeDisabled) {
+			this.choice.cantUndo = this.choice.cantUndo || pokemon.isLastActive();
 		}
 
 		if (mega || megax || megay) this.choice.mega = true;
@@ -794,61 +785,6 @@ export class Side {
 		if (terastallize) this.choice.terastallize = true;
 
 		return true;
-	}
-
-	updateDisabledRequest(pokemon: Pokemon, req: PokemonMoveRequestData) {
-		let updated = false;
-		if (pokemon.maybeLocked) {
-			pokemon.maybeLocked = false;
-			delete req.maybeLocked;
-			updated = true;
-		}
-		if (pokemon.maybeDisabled && this.battle.gameType !== 'singles') {
-			if (this.battle.gen >= 4) {
-				pokemon.maybeDisabled = false;
-				delete req.maybeDisabled;
-				updated = true;
-			}
-			for (const m of req.moves) {
-				const disabled = pokemon.getMoveData(m.id)?.disabled;
-				if (disabled && (this.battle.gen >= 4 || this.battle.actions.targetTypeChoices(m.target!))) {
-					m.disabled = true;
-					updated = true;
-				}
-			}
-		}
-		if (req.moves.every(m => m.disabled || m.id === 'struggle')) {
-			if (req.canMegaEvo) {
-				req.canMegaEvo = false;
-				updated = true;
-			}
-			if (req.canMegaEvoX) {
-				req.canMegaEvoX = false;
-				updated = true;
-			}
-			if (req.canMegaEvoY) {
-				req.canMegaEvoY = false;
-				updated = true;
-			}
-			if (req.canUltraBurst) {
-				req.canUltraBurst = false;
-				updated = true;
-			}
-			if (req.canZMove) {
-				req.canZMove = undefined;
-				updated = true;
-			}
-			if (req.canDynamax) {
-				req.canDynamax = false;
-				delete req.maxMoves;
-				updated = true;
-			}
-			if (req.canTerastallize) {
-				req.canTerastallize = undefined;
-				updated = true;
-			}
-		}
-		return updated;
 	}
 
 	updateRequestForPokemon(pokemon: Pokemon, update: (req: PokemonMoveRequestData) => boolean | void) {
@@ -944,7 +880,7 @@ export class Side {
 					return updated;
 				} });
 			} else if (pokemon.maybeTrapped) {
-				this.choice.cantUndo = true;
+				this.choice.cantUndo = this.choice.cantUndo || pokemon.isLastActive();
 			}
 		} else if (this.requestState === 'switch') {
 			if (!this.choice.forcedSwitchesLeft) {

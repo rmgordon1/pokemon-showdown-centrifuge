@@ -1999,7 +1999,13 @@ export class RandomTeams {
 				shiny,
 			};
 			if (this.gen === 9) {
-				set.teraType = species.requiredTeraType || this.forceTeraType || this.sample(this.dex.types.names());
+				// Tera type
+				if (species.requiredTeraType) set.teraType = species.requiredTeraType;
+				if (this.forceTeraType) {
+					set.teraType = this.forceTeraType;
+				} else {
+					set.teraType = this.sample(this.dex.types.names());
+				}
 			}
 			team.push(set);
 		}

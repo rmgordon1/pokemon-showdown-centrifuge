@@ -113,7 +113,7 @@ export class RandomGen7Teams extends RandomGen8Teams {
 				!counter.get('Bug') && (abilities.includes('Tinted Lens') || abilities.includes('Adaptability'))
 			),
 			Dark: (movePool, moves, abilities, types, counter) => !counter.get('Dark'),
-			Dragon: (movePool, moves, abilities, types, counter) => !counter.get('Dragon'),
+			Dragon: (movePool, moves, abilities, types, counter) => !counter.get('Dragon') && !abilities.includes('Aerilate'),
 			Electric: (movePool, moves, abilities, types, counter) => !counter.get('Electric'),
 			Fairy: (movePool, moves, abilities, types, counter) => !counter.get('Fairy'),
 			Fighting: (movePool, moves, abilities, types, counter) => !counter.get('Fighting'),

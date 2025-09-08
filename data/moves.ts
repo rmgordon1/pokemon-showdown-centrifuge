@@ -3151,23 +3151,30 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 			];
 			let success = false;
 			if (this.gameType === "freeforall") {
-				// the list of all sides in clockwise order
-				const sides = [this.sides[0], this.sides[3]!, this.sides[1], this.sides[2]!];
+				// random integer from 1-3 inclusive
+				const offset = this.random(3) + 1;
+				// the list of all sides in counterclockwise order
+				const sides = [this.sides[0], this.sides[2]!, this.sides[1], this.sides[3]!];
 				const temp: { [k: number]: typeof source.side.sideConditions } = { 0: {}, 1: {}, 2: {}, 3: {} };
 				for (const side of sides) {
 					for (const id in side.sideConditions) {
 						if (!sideConditions.includes(id)) continue;
 						temp[side.n][id] = side.sideConditions[id];
 						delete side.sideConditions[id];
+						const effectName = this.dex.conditions.get(id).name;
+						this.add('-sideend', side, effectName, '[silent]');
 						success = true;
 					}
 				}
 				for (let i = 0; i < 4; i++) {
 					const sourceSideConditions = temp[sides[i].n];
-					const targetSide = sides[(i + 1) % 4]; // the next side in rotation
+					const targetSide = sides[(i + offset) % 4]; // the next side in rotation
 					for (const id in sourceSideConditions) {
 						targetSide.sideConditions[id] = sourceSideConditions[id];
 						targetSide.sideConditions[id].target = targetSide;
+						const effectName = this.dex.conditions.get(id).name;
+						let layers = sourceSideConditions[id].layers || 1;
+						for (; layers > 0; layers--) this.add('-sidestart', targetSide, effectName, '[silent]');
 					}
 				}
 			} else {
@@ -3195,9 +3202,9 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 					sourceSideConditions[id] = targetTemp[id];
 					sourceSideConditions[id].target = source.side;
 				}
+				this.add('-swapsideconditions');
 			}
 			if (!success) return false;
-			this.add('-swapsideconditions');
 			this.add('-activate', source, 'move: Court Change');
 		},
 		secondary: null,
@@ -3960,8 +3967,9 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 			if (!target.getAbility().flags['failroleplay']) {
 				for (const pokemon of source.alliesAndSelf()) {
 					if (pokemon.ability === target.ability || pokemon.getAbility().flags['cantsuppress']) continue;
-					const oldAbility = pokemon.setAbility(target.ability, null, move);
+					const oldAbility = pokemon.setAbility(target.ability);
 					if (oldAbility) {
+						this.add('-ability', pokemon, target.getAbility().name, '[from] move: Doodle');
 						success = true;
 					} else if (!success && oldAbility === null) {
 						success = null;
@@ -5049,9 +5057,13 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 			}
 		},
 		onHit(target, source) {
-			const oldAbility = target.setAbility(source.ability, source);
-			if (!oldAbility) return oldAbility as false | null;
-			if (!target.isAlly(source)) target.volatileStaleness = 'external';
+			const oldAbility = target.setAbility(source.ability);
+			if (oldAbility) {
+				this.add('-ability', target, target.getAbility().name, '[from] move: Entrainment');
+				if (!target.isAlly(source)) target.volatileStaleness = 'external';
+				return;
+			}
+			return oldAbility as false | null;
 		},
 		secondary: null,
 		target: "normal",
@@ -9849,7 +9861,7 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 			onFoeDisableMove(pokemon) {
 				for (const moveSlot of this.effectState.source.moveSlots) {
 					if (moveSlot.id === 'struggle') continue;
-					pokemon.disableMove(moveSlot.id, true);
+					pokemon.disableMove(moveSlot.id, 'hidden');
 				}
 				pokemon.maybeDisabled = true;
 			},
@@ -11119,7 +11131,6 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 				newMove.hasBounced = true;
 				newMove.pranksterBoosted = false;
 				this.actions.useMove(newMove, this.effectState.target, { target: source });
-				move.hasBounced = true; // only bounce once in free-for-all battles
 				return null;
 			},
 		},
@@ -13546,6 +13557,11 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 		self: {
 			volatileStatus: 'lockedmove',
 		},
+		onAfterMove(pokemon) {
+			if (pokemon.volatiles['lockedmove'] && pokemon.volatiles['lockedmove'].duration === 1) {
+				pokemon.removeVolatile('lockedmove');
+			}
+		},
 		secondary: null,
 		target: "randomNormal",
 		type: "Dragon",
@@ -13765,6 +13781,11 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 		flags: { contact: 1, protect: 1, mirror: 1, dance: 1, metronome: 1, failinstruct: 1 },
 		self: {
 			volatileStatus: 'lockedmove',
+		},
+		onAfterMove(pokemon) {
+			if (pokemon.volatiles['lockedmove'] && pokemon.volatiles['lockedmove'].duration === 1) {
+				pokemon.removeVolatile('lockedmove');
+			}
 		},
 		secondary: null,
 		target: "randomNormal",
@@ -15198,6 +15219,11 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 		self: {
 			volatileStatus: 'lockedmove',
 		},
+		onAfterMove(pokemon) {
+			if (pokemon.volatiles['lockedmove']?.duration === 1) {
+				pokemon.removeVolatile('lockedmove');
+			}
+		},
 		secondary: null,
 		target: "randomNormal",
 		type: "Fire",
@@ -15357,12 +15383,12 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 		pp: 10,
 		priority: 0,
 		flags: { snatch: 1, metronome: 1 },
-		onHit(pokemon, source, move) {
+		onHit(pokemon) {
 			if (pokemon.item || !pokemon.lastItem) return false;
 			const item = pokemon.lastItem;
 			pokemon.lastItem = '';
 			this.add('-item', pokemon, this.dex.items.get(item), '[from] move: Recycle');
-			pokemon.setItem(item, source, move);
+			pokemon.setItem(item);
 		},
 		secondary: null,
 		target: "self",
@@ -15887,8 +15913,12 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 			if (target.getAbility().flags['failroleplay'] || source.getAbility().flags['cantsuppress']) return false;
 		},
 		onHit(target, source) {
-			const oldAbility = source.setAbility(target.ability, target);
-			if (!oldAbility) return oldAbility as false | null;
+			const oldAbility = source.setAbility(target.ability);
+			if (oldAbility) {
+				this.add('-ability', source, source.getAbility().name, '[from] move: Role Play', `[of] ${target}`);
+				return;
+			}
+			return oldAbility as false | null;
 		},
 		secondary: null,
 		target: "normal",
@@ -17085,9 +17115,13 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 				return false;
 			}
 		},
-		onHit(target, source) {
-			const oldAbility = target.setAbility('simple');
-			if (!oldAbility) return oldAbility as false | null;
+		onHit(pokemon) {
+			const oldAbility = pokemon.setAbility('simple');
+			if (oldAbility) {
+				this.add('-ability', pokemon, 'Simple', '[from] move: Simple Beam');
+				return;
+			}
+			return oldAbility as false | null;
 		},
 		secondary: null,
 		target: "normal",
@@ -20113,6 +20147,11 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 		self: {
 			volatileStatus: 'lockedmove',
 		},
+		onAfterMove(pokemon) {
+			if (pokemon.volatiles['lockedmove'] && pokemon.volatiles['lockedmove'].duration === 1) {
+				pokemon.removeVolatile('lockedmove');
+			}
+		},
 		secondary: null,
 		target: "randomNormal",
 		type: "Normal",
@@ -21865,10 +21904,16 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 				return false;
 			}
 		},
-		onHit(target, source) {
-			const oldAbility = target.setAbility('insomnia');
-			if (!oldAbility) return oldAbility as false | null;
-			if (target.status === 'slp') target.cureStatus();
+		onHit(pokemon) {
+			const oldAbility = pokemon.setAbility('insomnia');
+			if (oldAbility) {
+				this.add('-ability', pokemon, 'Insomnia', '[from] move: Worry Seed');
+				if (pokemon.status === 'slp') {
+					pokemon.cureStatus();
+				}
+				return;
+			}
+			return oldAbility as false | null;
 		},
 		secondary: null,
 		target: "normal",
@@ -22039,7 +22084,7 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 	// CAP moves
 
 	paleowave: {
-		num: -1,
+		num: 0,
 		accuracy: 100,
 		basePower: 85,
 		category: "Special",
@@ -22059,7 +22104,7 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 		contestType: "Beautiful",
 	},
 	shadowstrike: {
-		num: -2,
+		num: 0,
 		accuracy: 95,
 		basePower: 80,
 		category: "Physical",
@@ -22077,34 +22122,5 @@ export const Moves: import('../sim/dex-moves').MoveDataTable = {
 		target: "normal",
 		type: "Ghost",
 		contestType: "Clever",
-	},
-	polarflare: {
-		num: -3,
-		accuracy: 100,
-		basePower: 75,
-		category: "Special",
-		isNonstandard: "CAP",
-		name: "Polar Flare",
-		pp: 10,
-		priority: 0,
-		flags: { protect: 1, mirror: 1, defrost: 1, nosketch: 1 },
-		secondary: {
-			chance: 10,
-			status: 'frz',
-		},
-		onHit(target, pokemon, move) {
-			if (pokemon.baseSpecies.baseSpecies === 'Ramnarok' && !pokemon.transformed) {
-				move.willChangeForme = true;
-			}
-		},
-		onAfterMoveSecondarySelf(pokemon, target, move) {
-			if (move.willChangeForme) {
-				const forme = pokemon.species.id === 'ramnarokradiant' ? '' : '-Radiant';
-				pokemon.formeChange('Ramnarok' + forme, this.effect, false, '0', '[msg]');
-			}
-		},
-		target: "allAdjacentFoes",
-		type: "Fire",
-		contestType: "Beautiful",
 	},
 };

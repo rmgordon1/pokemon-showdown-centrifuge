@@ -116,10 +116,6 @@ export const Conditions: import('../../../sim/dex-conditions').ModdedConditionDa
 		onResidualOrder: 10,
 		onResidualSubOrder: 9,
 	},
-	lockedmove: {
-		inherit: true,
-		onAfterMove() {},
-	},
 	choicelock: {
 		inherit: true,
 		onStart(pokemon) {

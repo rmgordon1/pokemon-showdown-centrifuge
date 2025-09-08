@@ -16,7 +16,7 @@ interface MoveSlot {
 	pp: number;
 	maxpp: number;
 	target?: string;
-	disabled: boolean | 'hidden';
+	disabled: boolean | string;
 	disabledSource?: string;
 	used: boolean;
 	virtual?: boolean;
@@ -333,7 +333,6 @@ export class Pokemon {
 		this.gender = genders[set.gender] || this.species.gender || this.battle.sample(['M', 'F']);
 		if (this.gender === 'N') this.gender = '';
 		this.happiness = typeof set.happiness === 'number' ? this.battle.clampIntRange(set.happiness, 0, 255) : 255;
-		if (this.battle.format.mod === 'gen7letsgo') this.happiness = 70;
 		this.pokeball = toID(this.set.pokeball) || 'pokeball' as ID;
 		this.dynamaxLevel = typeof set.dynamaxLevel === 'number' ? this.battle.clampIntRange(set.dynamaxLevel, 0, 10) : 10;
 		this.gigantamax = this.set.gigantamax || false;
@@ -993,15 +992,17 @@ export class Pokemon {
 				// if each of a Pokemon's base moves are disabled by one of these effects, it will Struggle
 				const canCauseStruggle = ['Encore', 'Disable', 'Taunt', 'Assault Vest', 'Belch', 'Stuff Cheeks'];
 				disabled = this.maxMoveDisabled(moveSlot.id) || disabled && canCauseStruggle.includes(moveSlot.disabledSource!);
-			} else if (moveSlot.pp <= 0 && !this.volatiles['partialtrappinglock']) {
+			} else if (
+				(moveSlot.pp <= 0 && !this.volatiles['partialtrappinglock']) || disabled &&
+				this.side.active.length >= 2 && this.battle.actions.targetTypeChoices(target!)
+			) {
 				disabled = true;
 			}
 
-			if (disabled === 'hidden') {
-				disabled = !restrictData;
-			}
 			if (!disabled) {
 				hasValidMove = true;
+			} else if (disabled === 'hidden' && restrictData) {
+				disabled = false;
 			}
 
 			moves.push({
@@ -1073,8 +1074,6 @@ export class Pokemon {
 		};
 
 		if (isLastActive) {
-			this.maybeDisabled = this.maybeDisabled && !lockedMove;
-			this.maybeLocked = this.maybeLocked || this.maybeDisabled;
 			if (this.maybeDisabled) {
 				data.maybeDisabled = this.maybeDisabled;
 			}
@@ -1088,14 +1087,9 @@ export class Pokemon {
 					data.maybeTrapped = true;
 				}
 			}
-		} else {
-			this.maybeDisabled = false;
-			this.maybeLocked = false;
-			if (canSwitchIn) {
-				// Discovered by selecting a valid Pokémon as a switch target and cancelling.
-				if (this.trapped) data.trapped = true;
-			}
-			this.maybeTrapped = false;
+		} else if (canSwitchIn) {
+			// Discovered by selecting a valid Pokémon as a switch target and cancelling.
+			if (this.trapped) data.trapped = true;
 		}
 
 		if (!lockedMove) {
@@ -1311,7 +1305,7 @@ export class Pokemon {
 			this.knownType = true;
 			this.apparentType = this.terastallized;
 		}
-		if (this.battle.gen > 2) this.setAbility(pokemon.ability, this, null, true, true);
+		if (this.battle.gen > 2) this.setAbility(pokemon.ability, this, true, true);
 
 		// Change formes based on held items (for Transform)
 		// Only ever relevant in Generation 4 since Generation 3 didn't have item-based forme changes
@@ -1406,7 +1400,6 @@ export class Pokemon {
 			let details = (this.illusion || this).details;
 			if (this.terastallized) details += `, tera:${this.terastallized}`;
 			this.battle.add('detailschange', this, details);
-			this.updateMaxHp();
 			if (!source) {
 				// Tera forme
 				// Ogerpon/Terapagos text goes here
@@ -1446,7 +1439,7 @@ export class Pokemon {
 			}
 			const ability = species.abilities[abilitySlot] || species.abilities['0'];
 			// Ogerpon's forme change doesn't override permanent abilities
-			if (source || !this.getAbility().flags['cantsuppress']) this.setAbility(ability, null, null, true);
+			if (source || !this.getAbility().flags['cantsuppress']) this.setAbility(ability, null, true);
 			// However, its ability does reset upon switching out
 			this.baseAbility = toID(ability);
 		}
@@ -1455,16 +1448,6 @@ export class Pokemon {
 			this.apparentType = this.terastallized;
 		}
 		return true;
-	}
-
-	updateMaxHp() {
-		const newBaseMaxHp = this.battle.statModify(this.species.baseStats, this.set, 'hp');
-		if (newBaseMaxHp === this.baseMaxhp) return;
-		this.baseMaxhp = newBaseMaxHp;
-		const newMaxHP = this.volatiles['dynamax'] ? (2 * this.baseMaxhp) : this.baseMaxhp;
-		this.hp = this.hp <= 0 ? 0 : Math.max(1, newMaxHP - (this.maxhp - this.hp));
-		this.maxhp = newMaxHP;
-		if (this.hp) this.battle.add('-heal', this, this.getHealth, '[silent]');
 	}
 
 	clearVolatile(includeSwitchFlags = true) {
@@ -1591,7 +1574,7 @@ export class Pokemon {
 		return false;
 	}
 
-	disableMove(moveid: string, isHidden?: boolean, sourceEffect?: Effect) {
+	disableMove(moveid: string, isHidden?: boolean | string, sourceEffect?: Effect) {
 		if (!sourceEffect && this.battle.event) {
 			sourceEffect = this.battle.effect;
 		}
@@ -1599,7 +1582,7 @@ export class Pokemon {
 
 		for (const moveSlot of this.moveSlots) {
 			if (moveSlot.id === moveid && moveSlot.disabled !== true) {
-				moveSlot.disabled = isHidden ? 'hidden' : true;
+				moveSlot.disabled = (isHidden || true);
 				moveSlot.disabledSource = (sourceEffect?.name || moveSlot.move);
 			}
 		}
@@ -1838,8 +1821,7 @@ export class Pokemon {
 
 	setItem(item: string | Item, source?: Pokemon, effect?: Effect) {
 		if (!this.hp || !this.isActive) return false;
-		if (this.itemState.knockedOff && !(effect?.id === 'recycle')) return false;
-		delete this.itemState.knockedOff;
+		if (this.itemState.knockedOff) return false;
 		if (typeof item === 'string') item = this.battle.dex.items.get(item);
 
 		const effectid = this.battle.effect ? this.battle.effect.id : '';
@@ -1878,36 +1860,31 @@ export class Pokemon {
 		return this.setItem('');
 	}
 
-	setAbility(
-		ability: string | Ability, source?: Pokemon | null, sourceEffect?: Effect | null,
-		isFromFormeChange = false, isTransform = false,
-	) {
+	setAbility(ability: string | Ability, source?: Pokemon | null, isFromFormeChange = false, isTransform = false) {
 		if (!this.hp) return false;
 		if (typeof ability === 'string') ability = this.battle.dex.abilities.get(ability);
-		if (!sourceEffect && this.battle.effect) sourceEffect = this.battle.effect;
-		const oldAbility = this.battle.dex.abilities.get(this.ability);
+		const oldAbility = this.ability;
 		if (!isFromFormeChange) {
 			if (ability.flags['cantsuppress'] || this.getAbility().flags['cantsuppress']) return false;
 		}
 		if (!isFromFormeChange && !isTransform) {
-			const setAbilityEvent: boolean | null = this.battle.runEvent('SetAbility', this, source, sourceEffect, ability);
+			const setAbilityEvent: boolean | null = this.battle.runEvent('SetAbility', this, source, this.battle.effect, ability);
 			if (!setAbilityEvent) return setAbilityEvent;
 		}
-		this.battle.singleEvent('End', oldAbility, this.abilityState, this, source);
+		this.battle.singleEvent('End', this.battle.dex.abilities.get(oldAbility), this.abilityState, this, source);
+		if (this.battle.effect && this.battle.effect.effectType === 'Move' && !isFromFormeChange) {
+			this.battle.add(
+				'-endability', this, this.battle.dex.abilities.get(oldAbility),
+				`[from] move: ${this.battle.dex.moves.get(this.battle.effect.id)}`
+			);
+		}
 		this.ability = ability.id;
 		this.abilityState = this.battle.initEffectState({ id: ability.id, target: this });
-		if (sourceEffect && !isFromFormeChange && !isTransform) {
-			if (source) {
-				this.battle.add('-ability', this, ability.name, oldAbility.name, `[from] ${sourceEffect.fullname}`, `[of] ${source}`);
-			} else {
-				this.battle.add('-ability', this, ability.name, oldAbility.name, `[from] ${sourceEffect.fullname}`);
-			}
-		}
 		if (ability.id && this.battle.gen > 3 &&
-			(!isTransform || oldAbility.id !== ability.id || this.battle.gen <= 4)) {
+			(!isTransform || oldAbility !== ability.id || this.battle.gen <= 4)) {
 			this.battle.singleEvent('Start', ability, this.abilityState, this, source);
 		}
-		return oldAbility.id;
+		return oldAbility;
 	}
 
 	getAbility() {

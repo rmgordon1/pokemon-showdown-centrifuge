@@ -12,6 +12,7 @@
  * @license MIT
  */
 import { Utils } from '../lib';
+import { Dex } from '../sim/dex';
 
 export class LadderStore {
 	formatid: string;
@@ -49,7 +50,14 @@ export class LadderStore {
 		if (data && !data.errorip) {
 			mmr = Number(data);
 		}
-		if (isNaN(mmr)) return 1000;
+		const format = Dex.formats.get(this.formatid);
+		let startingElo = typeof (format as any).startingElo === 'number' ? (format as any).startingElo : 1000;
+		// If streakBased is true, automatically set startingElo to 0
+		if ((format as any).streakBased) {
+			startingElo = 0;
+		}
+		// If no existing rating or if existing rating is the old default (1000), use the new starting ELO
+		if (isNaN(mmr) || mmr === 1000) return startingElo;
 
 		if (user && user.id === userid) {
 			user.mmrCache[formatid] = mmr;
@@ -149,6 +157,18 @@ export class LadderStore {
 	 * Calculates Elo based on a match result
 	 */
 	calculateElo(oldElo: number, score: number, foeElo: number): number {
+		const format = Dex.formats.get(this.formatid);
+		
+		// Check for streak-based ELO system
+		if ((format as any).streakBased) {
+			// Simple win=+1, loss=0 system
+			if (score > 0.5) {
+				return oldElo + 1; // Win: increment by 1
+			} else {
+				return 0; // Loss: reset to 0
+			}
+		}
+
 		// see lib/ntbb-ladder.lib.php in the pokemon-showdown-client repo for the login server implementation
 		// *intentionally* different from calculation in ladders-local, due to the high activity on the main server
 
@@ -173,7 +193,11 @@ export class LadderStore {
 		const E = 1 / (1 + 10 ** ((foeElo - oldElo) / 400));
 
 		const newElo = oldElo + K * (score - E);
-
-		return Math.max(newElo, 1000);
+		let startingElo = typeof (format as any).startingElo === 'number' ? (format as any).startingElo : 1000;
+		// If streakBased is true, automatically set startingElo to 0
+		if ((format as any).streakBased) {
+			startingElo = 0;
+		}
+		return Math.max(newElo, startingElo);
 	}
 }

@@ -125,10 +125,6 @@ export class BattleActions {
 			oldActive.statsLoweredThisTurn = false;
 			oldActive.position = pokemon.position;
 			if (oldActive.fainted) oldActive.status = '';
-			if (this.battle.gen <= 4) {
-				pokemon.lastItem = oldActive.lastItem;
-				oldActive.lastItem = '';
-			}
 			pokemon.position = pos;
 			side.pokemon[pokemon.position] = pokemon;
 			side.pokemon[oldActive.position] = oldActive;
@@ -1601,7 +1597,7 @@ export class BattleActions {
 			return false;
 		}
 
-		if (move.ohko) return this.battle.gen === 3 ? target.hp : target.maxhp;
+		if (move.ohko) return target.maxhp;
 		if (move.damageCallback) return move.damageCallback.call(this.battle, source, target);
 		if (move.damage === 'level') {
 			return source.level;
@@ -1945,6 +1941,13 @@ export class BattleActions {
 		}
 		if (pokemon.species.name === 'Terapagos-Terastal') {
 			pokemon.formeChange('Terapagos-Stellar', null, true);
+			pokemon.baseMaxhp = Math.floor(Math.floor(
+				2 * pokemon.species.baseStats['hp'] + pokemon.set.ivs['hp'] + Math.floor(pokemon.set.evs['hp'] / 4) + 100
+			) * pokemon.level / 100 + 10);
+			const newMaxHP = pokemon.baseMaxhp;
+			pokemon.hp = newMaxHP - (pokemon.maxhp - pokemon.hp);
+			pokemon.maxhp = newMaxHP;
+			this.battle.add('-heal', pokemon, pokemon.getHealth, '[silent]');
 		}
 		if (pokemon.species.baseSpecies === 'Morpeko' && !pokemon.transformed &&
 			pokemon.baseSpecies.id !== pokemon.species.id

@@ -210,7 +210,7 @@ export const FormatsData: import('../../../sim/dex-species').ModdedSpeciesFormat
 		tier: "NFE",
 	},
 	victreebel: {
-		tier: "NU",
+		tier: "OU",
 	},
 	tentacool: {
 		tier: "ZU",
@@ -237,7 +237,7 @@ export const FormatsData: import('../../../sim/dex-species').ModdedSpeciesFormat
 		tier: "ZU",
 	},
 	slowbro: {
-		tier: "UU",
+		tier: "OU",
 	},
 	magnemite: {
 		tier: "LC",

@@ -109,8 +109,7 @@ describe("Dynamax", () => {
 		]]);
 		battle.makeChoices();
 		assert.cantMove(() => battle.choose('p1', 'move splash dynamax'));
-		battle.makeChoices('move struggle dynamax', 'move splash');
-		assert.false(battle.p1.active[0].volatiles['dynamax'], 'Feebas should not be Dynamaxed.');
+		assert.cantMove(() => battle.choose('p1', 'move struggle dynamax'));
 
 		battle = common.gen(8).createBattle([[
 			{ species: "Feebas", moves: ['splash'] },
@@ -119,10 +118,8 @@ describe("Dynamax", () => {
 		]]);
 		battle.makeChoices();
 		battle.makeChoices('move 1', 'auto');
-		battle.makeChoices('move splash dynamax', 'move splash');
-		assert.false(battle.p1.active[0].volatiles['dynamax'], 'Feebas should not be Dynamaxed.');
-		battle.makeChoices('testfight dynamax', 'move splash');
-		assert.false(battle.p1.active[0].volatiles['dynamax'], 'Feebas should not be Dynamaxed.');
+		assert.cantMove(() => battle.choose('p1', 'move splash dynamax'));
+		assert.cantMove(() => battle.choose('p1', 'move struggle dynamax'));
 	});
 
 	it(`should not allow the user to select max moves with 0 base PP remaining`, () => {

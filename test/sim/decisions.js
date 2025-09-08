@@ -358,11 +358,7 @@ describe('Choices', () => {
 			battle.p1.chooseMove(1);
 			assert(buffer.length >= 2);
 			assert(buffer.some(message => message.startsWith('p1\n|error|[Unavailable choice]')));
-			const message = buffer.find(message => message.startsWith('p1\n|request|'));
-			assert(message);
-			const request = JSON.parse(message.slice(12));
-			assert(request.active[0].moves[0].disabled);
-			assert(request.update);
+			assert(buffer.some(message => message.startsWith('p1\n|request|') && JSON.parse(message.slice(12)).active[0].moves[0].disabled));
 		});
 
 		it('should send meaningful feedback to players if they try to switch a trapped Pokémon out', () => {
@@ -380,11 +376,7 @@ describe('Choices', () => {
 			battle.p1.chooseSwitch(2);
 			assert(buffer.length >= 2);
 			assert(buffer.some(message => message.startsWith('p1\n|error|[Unavailable choice]')));
-			const message = buffer.find(message => message.startsWith('p1\n|request|'));
-			assert(message);
-			const request = JSON.parse(message.slice(12));
-			assert(request.active[0].trapped);
-			assert(request.update);
+			assert(buffer.some(message => message.startsWith('p1\n|request|') && JSON.parse(message.slice(12)).active[0].trapped));
 		});
 	});
 

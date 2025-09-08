@@ -43,30 +43,15 @@
  *
  * @license MIT
  */
-try {
-	require('source-map-support').install();
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-} catch (e) {
-}
+require('source-map-support').install();
 // NOTE: This file intentionally doesn't use too many modern JavaScript
 // features, so that it doesn't crash old versions of Node.js, so we
-// can successfully print the "We require Node.js 22+" message.
+// can successfully print the "We require Node.js 18+" message.
 
-// I've gotten enough reports by people who don't use the launch
-// script that this is worth repeating here
-try {
-// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-	fetch;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-} catch (e) {
-	throw new Error("We require Node.js version 22 or later; you're using " + process.version);
-}
-
-try {
-	require.resolve('ts-chacha20');
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-} catch (e) {
-	throw new Error("Dependencies are unmet; run `npm ci` before launching Pokemon Showdown again.");
+// Check for version
+const nodeVersion = parseInt(process.versions.node);
+if (isNaN(nodeVersion) || nodeVersion < 18) {
+	throw new Error("We require Node.js version 18 or later; you're using " + process.version);
 }
 
 import { FS, Repl } from '../lib';
@@ -131,6 +116,7 @@ function setupGlobals() {
 
 	const Verifier = require('./verifier');
 	global.Verifier = Verifier;
+	Verifier.PM.spawn();
 
 	const { Tournaments } = require('./tournaments');
 	global.Tournaments = Tournaments;
@@ -156,7 +142,7 @@ if (Config.crashguard) {
  * Start networking processes to be connected to
  *********************************************************/
 
-const { Sockets } = require('./sockets');
+import { Sockets } from './sockets';
 global.Sockets = Sockets;
 
 export function listen(port: number, bindAddress: string, workerCount: number) {
@@ -181,8 +167,9 @@ if (require.main === module) {
  * Set up our last global
  *********************************************************/
 
-const TeamValidatorAsync = require('./team-validator-async');
+import * as TeamValidatorAsync from './team-validator-async';
 global.TeamValidatorAsync = TeamValidatorAsync;
+TeamValidatorAsync.PM.spawn();
 
 /*********************************************************
  * Start up the REPL server
@@ -200,6 +187,16 @@ if (Config.startuphook) {
 }
 
 if (Config.ofemain) {
+	try {
+		require.resolve('node-oom-heapdump');
+	} catch (e: any) {
+		if (e.code !== 'MODULE_NOT_FOUND') throw e; // should never happen
+		throw new Error(
+			'node-oom-heapdump is not installed, but it is a required dependency if Config.ofe is set to true! ' +
+			'Run npm install node-oom-heapdump and restart the server.'
+		);
+	}
+
 	// Create a heapdump if the process runs out of memory.
 	global.nodeOomHeapdump = (require as any)('node-oom-heapdump')({
 		addTimestamp: true,

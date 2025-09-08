@@ -277,7 +277,7 @@ export class RuleTable extends Map<string, string> {
 		if (this.valueRules.get('evlimit') === 'Auto') {
 			this.evLimit = dex.gen > 2 ? 510 : null;
 			if (format.mod === 'gen7letsgo') {
-				this.evLimit = this.has('lgpenormalrules') ? 0 : null;
+				this.evLimit = this.has('allowavs') ? null : 0;
 			}
 			// Gen 6 hackmons also has a limit, which is currently implemented
 			// at the appropriate format.
@@ -483,6 +483,8 @@ export class Format extends BasicEffect implements Readonly<BasicEffect> {
 	}) => string[] | void;
 	declare readonly section?: string;
 	declare readonly column?: number;
+	declare readonly startingElo?: number;
+	declare readonly streakBased?: boolean;
 
 	constructor(data: AnyObject) {
 		super(data);

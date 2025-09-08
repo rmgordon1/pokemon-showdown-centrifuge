@@ -1124,6 +1124,32 @@ export const commands: Chat.ChatCommands = {
 	},
 	enableladderhelp: [`/enable - Allows all rated games to update the ladder. Requires: ~`],
 
+	clearladdercache(target, room, user) {
+		this.checkCan('disableladder');
+		const formatid = toID(target);
+		if (!formatid) {
+			throw new Chat.ErrorMessage(`Usage: /clearladdercache [formatid]`);
+		}
+
+		// Clear the ladder cache for the specified format
+		const { ladderCaches } = require('../ladders-local');
+		if (ladderCaches.has(formatid)) {
+			ladderCaches.delete(formatid);
+		}
+
+		// Clear user MMR cache for this format
+		for (const u of Users.users.values()) {
+			if (u.mmrCache[formatid]) {
+				delete u.mmrCache[formatid];
+			}
+		}
+
+		this.modlog(`CLEARLADDERCACHE`, null, formatid);
+		Monitor.log(`The ladder cache for ${formatid} was cleared by ${user.name}.`);
+		this.sendReply(`Ladder cache cleared for ${formatid}.`);
+	},
+	clearladdercachehelp: [`/clearladdercache [formatid] - Clears the ladder cache for the specified format. Requires: ~`],
+
 	lockdown(target, room, user) {
 		this.checkCan('lockdown');
 

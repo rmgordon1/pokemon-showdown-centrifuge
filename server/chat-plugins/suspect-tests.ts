@@ -17,7 +17,7 @@ interface SuspectsFile {
 
 export let suspectTests: SuspectsFile = JSON.parse(FS(SUSPECTS_FILE).readIfExistsSync() || "{}");
 
-export function saveSuspectTests() {
+function saveSuspectTests() {
 	FS(SUSPECTS_FILE).writeUpdate(() => JSON.stringify(suspectTests));
 }
 
@@ -49,7 +49,8 @@ export const commands: Chat.ChatCommands = {
 			if (!this.runBroadcast()) return;
 
 			let buffer = '<strong>Suspect tests currently running:</strong>';
-			for (const test of Object.values(suspects)) {
+			for (const i of Object.keys(suspects)) {
+				const test = suspects[i];
 				buffer += '<br />';
 				buffer += `${Utils.escapeHTML(test.tier)}: <a href="${test.url}">${Utils.escapeHTML(test.suspect)}</a> (${test.date})`;
 			}
@@ -109,15 +110,14 @@ export const commands: Chat.ChatCommands = {
 				throw new Chat.ErrorMessage("Error adding suspect test: " + (out?.actionerror || error?.message));
 			}
 
-			const prevSuspect = suspectTests.suspects[format.id];
-			this.privateGlobalModAction(`${user.name} ${prevSuspect ? "edited the" : "added a"} ${format.name} suspect test.`);
-			this.globalModlog('SUSPECTTEST', null, `${prevSuspect ? "edited" : "added"} ${format.name}`);
+			this.privateGlobalModAction(`${user.name} ${suspectTests.suspects[format.id] ? "edited the" : "added a"} ${format.name} suspect test.`);
+			this.globalModlog('SUSPECTTEST', null, `${suspectTests.suspects[format.id] ? "edited" : "added"} ${format.name}`);
 
 			suspectTests.suspects[format.id] = {
 				tier: format.name,
 				suspect: suspectString,
 				date: dateActual,
-				url: out.url || prevSuspect.url,
+				url: out.url,
 			};
 			saveSuspectTests();
 			this.sendReply(`Added a suspect test notice for ${suspectString} in ${format.name}.`);

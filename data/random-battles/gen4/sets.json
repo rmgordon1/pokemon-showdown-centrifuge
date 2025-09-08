@@ -851,7 +851,7 @@
         ]
     },
     "snorlax": {
-        "level": 77,
+        "level": 78,
         "sets": [
             {
                 "role": "Bulky Attacker",
@@ -897,7 +897,7 @@
         ]
     },
     "moltres": {
-        "level": 81,
+        "level": 82,
         "sets": [
             {
                 "role": "Bulky Attacker",
@@ -947,7 +947,7 @@
             },
             {
                 "role": "Bulky Setup",
-                "movepool": ["batonpass", "earthquake", "explosion", "swordsdance", "zenheadbutt"],
+                "movepool": ["batonpass", "earthquake", "explosion", "suckerpunch", "superpower", "swordsdance", "zenheadbutt"],
                 "abilities": ["Synchronize"],
                 "preferredTypes": ["Ground"]
             }
@@ -1260,7 +1260,7 @@
         ]
     },
     "dunsparce": {
-        "level": 93,
+        "level": 92,
         "sets": [
             {
                 "role": "Bulky Attacker",
@@ -1446,7 +1446,7 @@
         ]
     },
     "kingdra": {
-        "level": 79,
+        "level": 80,
         "sets": [
             {
                 "role": "Bulky Setup",
@@ -1893,7 +1893,7 @@
         ]
     },
     "shedinja": {
-        "level": 99,
+        "level": 98,
         "sets": [
             {
                 "role": "Setup Sweeper",
@@ -2215,7 +2215,7 @@
         ]
     },
     "zangoose": {
-        "level": 85,
+        "level": 84,
         "sets": [
             {
                 "role": "Wallbreaker",
@@ -2358,7 +2358,7 @@
             {
                 "role": "Wallbreaker",
                 "movepool": ["hiddenpowerfighting", "shadowclaw", "shadowsneak", "thunderwave", "willowisp"],
-                "abilities": ["Frisk", "Insomnia"]
+                "abilities": ["Frisk"]
             }
         ]
     },
@@ -2441,6 +2441,12 @@
                 "movepool": ["doubleedge", "hiddenpowergrass", "hydropump", "icebeam", "raindance", "surf"],
                 "abilities": ["Swift Swim"],
                 "preferredTypes": ["Ice"]
+            },
+            {
+                "role": "Fast Attacker",
+                "movepool": ["doubleedge", "hiddenpowergrass", "hydropump", "icebeam", "suckerpunch", "surf"],
+                "abilities": ["Swift Swim"],
+                "preferredTypes": ["Ice"]
             }
         ]
     },
@@ -2496,13 +2502,13 @@
         "sets": [
             {
                 "role": "Setup Sweeper",
-                "movepool": ["agility", "earthquake", "explosion", "meteormash", "zenheadbutt"],
+                "movepool": ["agility", "earthquake", "explosion", "icepunch", "meteormash", "thunderpunch", "zenheadbutt"],
                 "abilities": ["Clear Body"],
                 "preferredTypes": ["Ground"]
             },
             {
                 "role": "Bulky Support",
-                "movepool": ["bulletpunch", "earthquake", "explosion", "meteormash", "stealthrock", "zenheadbutt"],
+                "movepool": ["bulletpunch", "earthquake", "explosion", "icepunch", "meteormash", "stealthrock", "thunderpunch", "zenheadbutt"],
                 "abilities": ["Clear Body"],
                 "preferredTypes": ["Ground"]
             }
@@ -2918,7 +2924,7 @@
         ]
     },
     "floatzel": {
-        "level": 84,
+        "level": 83,
         "sets": [
             {
                 "role": "Fast Attacker",
@@ -3019,7 +3025,7 @@
         ]
     },
     "purugly": {
-        "level": 87,
+        "level": 88,
         "sets": [
             {
                 "role": "Fast Attacker",
@@ -3561,7 +3567,7 @@
         ]
     },
     "dialga": {
-        "level": 70,
+        "level": 71,
         "sets": [
             {
                 "role": "Bulky Attacker",
@@ -3705,7 +3711,7 @@
         ]
     },
     "shayminsky": {
-        "level": 70,
+        "level": 69,
         "sets": [
             {
                 "role": "Fast Attacker",

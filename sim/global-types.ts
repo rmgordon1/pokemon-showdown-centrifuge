@@ -311,9 +311,8 @@ interface ModdedBattlePokemon {
 	runEffectiveness?: (this: Pokemon, move: ActiveMove) => number;
 	runImmunity?: (this: Pokemon, source: ActiveMove | string, message?: string | boolean) => boolean;
 	setAbility?: (
-		this: Pokemon, ability: string | Ability, source?: Pokemon | null, sourceEffect?: Effect | null,
-		isFromFormeChange?: boolean, isTransform?: boolean
-	) => ID | false | null;
+		this: Pokemon, ability: string | Ability, source: Pokemon | null, isFromFormeChange: boolean
+	) => string | false;
 	setItem?: (this: Pokemon, item: string | Item, source?: Pokemon, effect?: Effect) => boolean;
 	setStatus?: (
 		this: Pokemon, status: string | Condition, source: Pokemon | null,
@@ -366,11 +365,11 @@ interface ModdedBattleScriptsData extends Partial<BattleScriptsData> {
 	maybeTriggerEndlessBattleClause?: (
 		this: Battle, trappedBySide: boolean[], stalenessBySide: ('internal' | 'external' | undefined)[]
 	) => boolean | undefined;
+	natureModify?: (this: Battle, stats: StatsTable, set: PokemonSet) => StatsTable;
 	endTurn?: (this: Battle) => void;
 	runAction?: (this: Battle, action: Action) => void;
-	statModify?: (this: Battle, baseStats: StatsTable, set: PokemonSet, statName: StatID) => number;
+	spreadModify?: (this: Battle, baseStats: StatsTable, set: PokemonSet) => StatsTable;
 	start?: (this: Battle) => void;
-	runPickTeam?: () => void;
 	suppressingWeather?: (this: Battle) => boolean;
 	trunc?: (n: number) => number;
 	win?: (this: Battle, side?: SideID | '' | Side | null) => boolean;
