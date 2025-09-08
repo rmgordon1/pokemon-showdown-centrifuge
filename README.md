@@ -12,7 +12,8 @@ Battle Centrifuge - Introduction
   - On your first game, you will have a team of 6 random Pokémon from the same logic that controls Pokémon Showdown's iconic Random Battles format
   - You will choose 3 of the 6 you are given to play this game with.
   - If you defeat your opponent, you will have your 3 Pokémon saved on the server. In addition, you will get the choice to swap one of the Pokémon you battled with one of your opponents.
-  - Subsequent games will use this saved set. You can swap up to once after each win
+  - Subsequent games will use this saved set. You can swap up to once after each win.
+  - If you lose, you start over and have to choose 3 new Pokémon from a random 6 again
 
 - Changes to Elo/Matchmaking
 
@@ -21,7 +22,7 @@ Battle Centrifuge - Introduction
     - All players start at 0 Elo for this gamemode
     - A win increases your Elo by 1
     - A loss resets your Elo to 0
-    - Matchmaking is adjusted so the search range is narrower given the difference in scale between this elo and traditionally.
+    - Matchmaking is adjusted so the search range is narrower given the difference in scale between this elo and other gamemodes
 
 
 A Server at this address is up for you to test.
